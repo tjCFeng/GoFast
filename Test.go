@@ -34,7 +34,7 @@ func main() {
 	serverTCP.OnRead = ClientOnRead
 	serverTCP.OnClose = ClientOnClose
 	serverTCP.Listen("80")
-	//server.AddBlackList("127.0.0.1")
+	//serverTCP.AddBlackList("127.0.0.1")
 	defer serverTCP.Stop()
 
 	reader := bufio.NewReader(os.Stdin)
