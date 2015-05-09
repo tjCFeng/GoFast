@@ -23,12 +23,14 @@ func ClientOnClose(IPPort string) {
 }
 
 func main() {
+	//DDNS
 	ddns := DDNS.Inat123("username", "password", "domain", 3)
 	ddns.Start()
 	time.Sleep(time.Minute * 10)
 	ddns.Stop()
 	fmt.Println(ddns.UpdateResult())
 	
+	//ServerTCP
 	serverTCP := new(Server.ServerTCP)
 	serverTCP.OnAccept = ClientOnAccept
 	serverTCP.OnRead = ClientOnRead
@@ -37,6 +39,7 @@ func main() {
 	//serverTCP.AddBlackList("127.0.0.1")
 	defer serverTCP.Stop()
 
+	//Loop
 	reader := bufio.NewReader(os.Stdin)
 	key, _, _:= reader.ReadLine()
 	if string(key) == "" {}
