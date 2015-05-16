@@ -9,20 +9,24 @@ import (
 	"strings"
 )
 
+type onUpdated func (UpdateResult string)
+
 type nat123_com struct {
 	username	string
 	password	string
 	domain		string
-	freqUpdate	uint8 //Minute
+	freqUpdate	uint16 //Minute
 	
 	lastUpdate	time.Time
 	lastResult	string
 	msg			chan uint8
+	
+	OnUpdated	onUpdated
 }
 
 var inat123_com *nat123_com = nil
 
-func Inat123(Username, Password, Domain string, Freq uint8) *nat123_com {
+func Inat123(Username, Password, Domain string, Freq uint16) *nat123_com {
 	if inat123_com == nil {
 		inat123_com = &nat123_com{}
 		inat123_com.username = Username
@@ -75,6 +79,7 @@ func (this *nat123_com) update(IP string) {
 	if err != nil { return }
 
 	this.lastResult = string(Body)
+	if this.OnUpdated != nil { this.OnUpdated(this.lastResult)}
 	
 	/*switch this.lastResult {
 		case "good": fmt.Println("更新成功")
