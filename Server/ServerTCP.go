@@ -17,10 +17,10 @@ type ClientTCP struct {
 	mutex		*sync.Mutex
 }
 
-type TOnAccept func (Client *ClientTCP)
-type TOnRead func (Client *ClientTCP)
-type TOnWrite func (Client *ClientTCP)
-type TOnClose func (IPPort string)
+type onAccept func (Client *ClientTCP)
+type onRead func (Client *ClientTCP)
+type onWrite func (Client *ClientTCP)
+type onClose func (IPPort string)
 
 type ServerTCP struct {
 	hServer			*net.TCPListener
@@ -34,10 +34,10 @@ type ServerTCP struct {
 	chStop			chan bool
 	
 	OverTime		uint16
-	OnAccept	TOnAccept
-	OnRead		TOnRead
-	OnWrite		TOnWrite
-	OnClose		TOnClose
+	OnAccept	onAccept
+	OnRead		onRead
+	OnWrite		onWrite
+	OnClose		onClose
 }
 
 func (this *ServerTCP) Listen(Port string)  error {
@@ -99,6 +99,11 @@ func (this *ServerTCP) CloseClientByIPPort(IPPort string) {
 func (this *ServerTCP) AddBlackList(IP string) {
 	this.blackList[IP] = time.Now()
 }
+
+func (this *ServerTCP) ClientCount() int {
+	return len(this.clientList)
+}
+
 
 func (this *ServerTCP) clientAccept() {
 	var IPPort string = ""
