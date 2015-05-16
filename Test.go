@@ -1,12 +1,26 @@
 package main
 
 import (
-	"time"
 	"fmt"
+	"bufio"
+	"os"
 	"github.com/tjCFeng/GoFast/DDNS"
 	"github.com/tjCFeng/GoFast/Server"
 )
 
+/*DDNS************************************************************************/
+func DDNSOnUpdated(UpdateResult string) {
+	switch UpdateResult {
+		case "good": fmt.Println("更新成功")
+		case "nochg": fmt.Println("IP未变化")
+		case "nohost": fmt.Println("域名不存在")
+		case "badauth": fmt.Println("用户名或密码错误")
+		case "abuse": fmt.Println("请求失败，连接频繁")
+		case "servererror": fmt.Println("系统错误")
+	}
+}
+
+/*ServerTCP********************************************************************/
 func ClientOnAccept(Client *Server.ClientTCP) {
 	fmt.Println("Accept: ", Client.IPPort())
 }
@@ -24,12 +38,11 @@ func ClientOnClose(IPPort string) {
 
 func main() {
 	//DDNS
-	ddns := DDNS.Inat123("username", "password", "domain", 3)
-	ddns.Start()
-	time.Sleep(time.Minute * 10)
-	ddns.Stop()
-	fmt.Println(ddns.UpdateResult())
-	
+	ddns := DDNS.Inat123("Username", "Password", "Domain", 3)
+	ddns.OnUpdated = DDNSOnUpdated
+	go ddns.Start()
+	defer ddns.Stop()
+
 	//ServerTCP
 	serverTCP := new(Server.ServerTCP)
 	serverTCP.OnAccept = ClientOnAccept
@@ -39,8 +52,15 @@ func main() {
 	//serverTCP.AddBlackList("127.0.0.1")
 	defer serverTCP.Stop()
 
-	//Loop
+
 	reader := bufio.NewReader(os.Stdin)
-	key, _, _:= reader.ReadLine()
-	if string(key) == "" {}
+	for {
+		key, _, _:= reader.ReadLine()
+		switch string(key)  {
+			
+			case "client": fmt.Println(serverTCP.ClientCount())
+			case "exit": return
+			default: continue
+		}
+	}
 }
