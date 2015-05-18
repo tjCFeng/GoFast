@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"bufio"
 	"os"
-	"github.com/tjCFeng/GoFast/DDNS"
-	"github.com/tjCFeng/GoFast/Server"
+	//"github.com/tjCFeng/GoFast/DDNS"
+	//"github.com/tjCFeng/GoFast/Server"
 )
 
 /*DDNS************************************************************************/
@@ -17,23 +17,25 @@ func DDNSOnUpdated(UpdateResult string) {
 		case "badauth": fmt.Println("用户名或密码错误")
 		case "abuse": fmt.Println("请求失败，连接频繁")
 		case "servererror": fmt.Println("系统错误")
+		default: fmt.Println(UpdateResult + ": 未知错误")
 	}
 }
 
 /*ServerTCP********************************************************************/
 func ClientOnAccept(Client *Server.ClientTCP) {
-	fmt.Println("Accept: ", Client.IPPort())
+	//fmt.Println("Accept: ", Client.IPPort())
 }
 
 func ClientOnRead(Client *Server.ClientTCP) {
-	fmt.Println("Read: " + Client.GetDateTime().String())
+	//fmt.Println("Read: " + Client.GetDateTime().String())
 	Data, _ := Client.GetData()
+	Client.ClearData(0)
 	Client.Send([]uint8(Data))
-	Client.Close()
+	//Client.Close()
 }
 
 func ClientOnClose(IPPort string) {
-	fmt.Println("Close: ", IPPort)
+	//fmt.Println("Close: ", IPPort)
 }
 
 func main() {
