@@ -1,4 +1,4 @@
-package Server
+package TCP
 
 import (
 	"net"
@@ -8,19 +8,7 @@ import (
 	"time"
 )
 
-type ClientTCP struct {
-	hClient  *net.TCPConn
-	ipport   string
-	datetime time.Time
-	dataBuf  []byte
-	dataLen  int
-	mutex    *sync.Mutex
-}
-
-type onAccept func(Client *ClientTCP)
-type onRead func(Client *ClientTCP)
-type onWrite func(Client *ClientTCP)
-type onClose func(IPPort string)
+type onClientAccept func(Client *ClientTCP)
 
 type ServerTCP struct {
 	hServer    *net.TCPListener
@@ -35,10 +23,10 @@ type ServerTCP struct {
 	chStop   chan bool
 
 	OverTime uint16
-	OnAccept onAccept
-	OnRead   onRead
-	OnWrite  onWrite
-	OnClose  onClose
+	OnClientAccept onClientAccept
+	OnClientRead   onClientRead
+	OnClientWrite  onClientWrite
+	OnClientClose  onClientClose
 }
 
 func (this *ServerTCP) Listen(Port string) error {
@@ -56,7 +44,7 @@ func (this *ServerTCP) Listen(Port string) error {
 
 	this.clientList = make(map[string]*ClientTCP)
 	this.blackList = make(map[string]time.Time)
-	this.gBuffer = make([]byte, 1536)
+	this.gBuffer = make([]uint8, 1536)
 
 	this.hServer, err = net.ListenTCP("tcp", addr)
 	if err != nil { return err }
@@ -158,62 +146,27 @@ func (this *ServerTCP) clientEvent() {
 
 	for {
 		select {
-		case IPPort = <-this.chAccept:
-			Client = this.clientList[IPPort]
-			if Client == nil { continue }
-			Client.datetime = time.Now()
-			if this.OnAccept != nil { this.OnAccept(Client) }
+			case IPPort = <-this.chAccept:
+				Client = this.clientList[IPPort]
+				if Client == nil { continue }
+				Client.datetime = time.Now()
+				if this.OnClientAccept != nil { this.OnClientAccept(Client) }
 
-		case IPPort = <-this.chRead:
-			Client = this.clientList[IPPort]
-			if Client == nil { continue }
-			Client.datetime = time.Now()
-			if this.OnRead != nil { this.OnRead(Client) }
+			case IPPort = <-this.chRead:
+				Client = this.clientList[IPPort]
+				if Client == nil { continue }
+				Client.datetime = time.Now()
+				if this.OnClientRead != nil { this.OnClientRead(Client) }
 
-		case IPPort = <-this.chWrite:
-			//Log
+			case IPPort = <-this.chWrite:
+				//Log
 
-		case IPPort = <-this.chClose:
-			this.clearClient(IPPort)
-			if this.OnClose != nil { this.OnClose(IPPort) }
+			case IPPort = <-this.chClose:
+				this.clearClient(IPPort)
+				if this.OnClientClose != nil { this.OnClientClose(IPPort) }
 
-		case <-this.chStop:
-			return
+			case <-this.chStop:
+				return
 		}
 	}
-}
-
-/******************************************************************************/
-func (this *ClientTCP) Send(Data []uint8) (int, error) {
-	return this.hClient.Write(Data)
-}
-
-func (this *ClientTCP) IPPort() string {
-	return this.ipport
-}
-
-func (this *ClientTCP) GetData() (Data []uint8, Len int) {
-	return this.dataBuf, this.dataLen
-}
-
-func (this *ClientTCP) ClearData(Len int) {
-	this.mutex.Lock()
-	defer this.mutex.Unlock()
-	
-	switch Len {
-		case 0:
-			this.dataBuf = this.dataBuf[0:0]
-			this.dataLen = 0
-		default:
-			this.dataBuf = this.dataBuf[Len-1:]
-			this.dataLen -= Len
-	}
-}
-
-func (this *ClientTCP) GetDateTime() time.Time {
-	return this.datetime
-}
-
-func (this *ClientTCP) Close() {
-	this.hClient.Close()
 }
