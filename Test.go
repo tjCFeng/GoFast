@@ -5,8 +5,8 @@ import (
 	"bufio"
 	"os"
 	"time"
-	//"github.com/tjCFeng/GoFast/DDNS"
-	//"github.com/tjCFeng/GoFast/TCP"
+	"github.com/tjCFeng/GoFast/DDNS"
+	"github.com/tjCFeng/GoFast/TCP"
 )
 
 /*DDNS************************************************************************/
@@ -73,6 +73,7 @@ func main() {
 	//serverTCP.AddBlackList("127.0.0.1")
 	defer serverTCP.Stop()
 	
+	//ClientTCP
 	clientTCP := new(TCP.ClientTCP)
 	fmt.Println(clientTCP)
 	clientTCP.OnClientConnected = OnConnectedClient
