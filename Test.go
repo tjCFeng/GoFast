@@ -72,7 +72,6 @@ func main() {
 	
 	//ClientTCP
 	clientTCP := new(TCP.ClientTCP)
-	fmt.Println(clientTCP)
 	clientTCP.OnClientConnected = OnConnectedClient
 	clientTCP.OnClientRead = OnReadClient
 	clientTCP.OnClientClose = OnCloseClient
