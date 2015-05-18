@@ -45,12 +45,9 @@ func OnConnectedClient(Client *TCP.ClientTCP) {
 }
 
 func OnReadClient(Client *TCP.ClientTCP) {
-	//fmt.Println("Read: " + Client.GetDateTime().String())
 	Data, _ := Client.GetData()
 	fmt.Println("Read: ", string(Data))
 	Client.ClearData(0)
-	//Client.Send([]uint8(Data))
-	//Client.Close()
 }
 
 func OnCloseClient(IPPort string) {
