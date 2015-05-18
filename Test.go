@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"bufio"
 	"os"
+	"time"
 	//"github.com/tjCFeng/GoFast/DDNS"
-	//"github.com/tjCFeng/GoFast/Server"
+	//"github.com/tjCFeng/GoFast/TCP"
 )
 
 /*DDNS************************************************************************/
@@ -22,20 +23,38 @@ func DDNSOnUpdated(UpdateResult string) {
 }
 
 /*ServerTCP********************************************************************/
-func ClientOnAccept(Client *Server.ClientTCP) {
+func ClientOnAccept(Client *TCP.ClientTCP) {
 	//fmt.Println("Accept: ", Client.IPPort())
 }
 
-func ClientOnRead(Client *Server.ClientTCP) {
+func ClientOnRead(Client *TCP.ClientTCP) {
 	//fmt.Println("Read: " + Client.GetDateTime().String())
 	Data, _ := Client.GetData()
 	Client.ClearData(0)
 	Client.Send([]uint8(Data))
-	//Client.Close()
+	Client.Close()
 }
 
 func ClientOnClose(IPPort string) {
 	//fmt.Println("Close: ", IPPort)
+}
+
+/*ClientTCP********************************************************************/
+func OnConnectedClient(Client *TCP.ClientTCP) {
+	fmt.Println("Connected: ", Client.IPPort())
+}
+
+func OnReadClient(Client *TCP.ClientTCP) {
+	//fmt.Println("Read: " + Client.GetDateTime().String())
+	Data, _ := Client.GetData()
+	fmt.Println("Read: ", string(Data))
+	Client.ClearData(0)
+	//Client.Send([]uint8(Data))
+	//Client.Close()
+}
+
+func OnCloseClient(IPPort string) {
+	fmt.Println("Close: ", IPPort)
 }
 
 func main() {
@@ -46,13 +65,24 @@ func main() {
 	defer ddns.Stop()
 
 	//ServerTCP
-	serverTCP := new(Server.ServerTCP)
-	serverTCP.OnAccept = ClientOnAccept
-	serverTCP.OnRead = ClientOnRead
-	serverTCP.OnClose = ClientOnClose
+	serverTCP := new(TCP.ServerTCP)
+	serverTCP.OnClientAccept = ClientOnAccept
+	serverTCP.OnClientRead = ClientOnRead
+	serverTCP.OnClientClose = ClientOnClose
 	serverTCP.Listen("80")
 	//serverTCP.AddBlackList("127.0.0.1")
 	defer serverTCP.Stop()
+	
+	clientTCP := new(TCP.ClientTCP)
+	fmt.Println(clientTCP)
+	clientTCP.OnClientConnected = OnConnectedClient
+	clientTCP.OnClientRead = OnReadClient
+	clientTCP.OnClientClose = OnCloseClient
+	clientTCP.Connect("127.0.0.1", "80")
+	time.Sleep(time.Second * 3)
+	clientTCP.Send([]uint8("Client Send Data!"))
+	time.Sleep(time.Second * 5)
+	defer clientTCP.Close()
 
 
 	reader := bufio.NewReader(os.Stdin)
