@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 	"github.com/tjCFeng/GoFast/DDNS"
-	"github.com/tjCFeng/GoFast/TCP"
+	"github.com/tjCFeng/GoFast/Socket"
 )
 
 /*DDNS************************************************************************/
@@ -23,28 +23,28 @@ func DDNSOnUpdated(UpdateResult string) {
 }
 
 /*ServerTCP********************************************************************/
-func ClientOnAccept(Client *TCP.ClientTCP) {
+func ClientOnAccept(Client *Socket.ClientTCP) {
 	//fmt.Println("Accept: ", Client.IPPort())
 }
 
-func ClientOnRead(Client *TCP.ClientTCP) {
+func ClientOnRead(Client *Socket.ClientTCP) {
 	//fmt.Println("Read: " + Client.GetDateTime().String())
 	Data, _ := Client.GetData()
 	Client.ClearData(0)
 	Client.Send([]uint8(Data))
-	Client.Close()
+	//Client.Close()
 }
 
 func ClientOnClose(IPPort string) {
-	//fmt.Println("Close: ", IPPort)
+	//fmt.Println("CloseClient: ", IPPort)
 }
 
 /*ClientTCP********************************************************************/
-func OnConnectedClient(Client *TCP.ClientTCP) {
+func OnConnectedClient(Client *Socket.ClientTCP) {
 	fmt.Println("Connected: ", Client.IPPort())
 }
 
-func OnReadClient(Client *TCP.ClientTCP) {
+func OnReadClient(Client *Socket.ClientTCP) {
 	Data, _ := Client.GetData()
 	fmt.Println("Read: ", string(Data))
 	Client.ClearData(0)
@@ -62,7 +62,7 @@ func main() {
 	defer ddns.Stop()
 
 	//ServerTCP
-	serverTCP := new(TCP.ServerTCP)
+	serverTCP := new(Socket.ServerTCP)
 	serverTCP.OnClientAccept = ClientOnAccept
 	serverTCP.OnClientRead = ClientOnRead
 	serverTCP.OnClientClose = ClientOnClose
@@ -71,14 +71,13 @@ func main() {
 	defer serverTCP.Stop()
 	
 	//ClientTCP
-	clientTCP := new(TCP.ClientTCP)
+	clientTCP := new(Socket.ClientTCP)
 	clientTCP.OnClientConnected = OnConnectedClient
 	clientTCP.OnClientRead = OnReadClient
 	clientTCP.OnClientClose = OnCloseClient
 	clientTCP.Connect("127.0.0.1", "80")
 	time.Sleep(time.Second * 3)
 	clientTCP.Send([]uint8("Client Send Data!"))
-	time.Sleep(time.Second * 5)
 	defer clientTCP.Close()
 
 
