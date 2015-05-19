@@ -1,4 +1,4 @@
-package TCP
+package Socket
 
 import (
 	"net"
@@ -77,7 +77,7 @@ func (this *ClientTCP) ClearData(Len int) {
 			this.dataBuf = this.dataBuf[0:0]
 			this.dataLen = 0
 		default:
-			this.dataBuf = this.dataBuf[Len-1:]
+			this.dataBuf = this.dataBuf[Len - 1:]
 			this.dataLen -= Len
 	}
 }
@@ -98,7 +98,7 @@ func (this *ClientTCP) Read() {
 		}
 
 		this.mutex.Lock()
-		this.dataBuf = append(this.dataBuf, Buf[0:count-1]...)
+		this.dataBuf = append(this.dataBuf, Buf[0:count]...)
 		this.dataLen += count
 		this.mutex.Unlock()
 		this.chRead <- true
