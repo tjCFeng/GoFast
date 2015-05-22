@@ -31,7 +31,7 @@ type ServerTCP struct {
 
 func (this *ServerTCP) Listen(Port string) error {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	if this.OverTime == 0 { this.OverTime = 10 }
+	if this.OverTime == 0 { this.OverTime = 60}
 
 	addr, err := net.ResolveTCPAddr("tcp", ":" + Port)
 	if err != nil { return err }
