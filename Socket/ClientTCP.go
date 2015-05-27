@@ -10,7 +10,7 @@ import (
 type onClientConnected func(Client *ClientTCP)
 type onClientRead func(Client *ClientTCP)
 type onClientWrite func(Client *ClientTCP)
-type onClientClose func(IPPort string)
+type onClientDisconnected func(IPPort string)
 
 type ClientTCP struct {
 	//ClientTCP、ServerTCP共用
@@ -30,7 +30,7 @@ type ClientTCP struct {
 	OnClientConnected onClientConnected
 	OnClientRead   onClientRead
 	OnClientWrite  onClientWrite
-	OnClientClose  onClientClose
+	OnClientDisconnected  onClientDisconnected
 }
 
 func (this *ClientTCP) Connect(RemoteIP, RemotePort string) error {
@@ -40,7 +40,7 @@ func (this *ClientTCP) Connect(RemoteIP, RemotePort string) error {
 	this.chConnected = make(chan bool)
 	this.chRead = make(chan bool)
 	this.chWrite = make(chan bool)
-	this.chClose = make(chan bool)
+	this.chClose= make(chan bool)
 
 	this.hClient, err = net.DialTCP("tcp",  nil, addr)
 	if err != nil { return err }
@@ -86,7 +86,7 @@ func (this *ClientTCP) GetDateTime() time.Time {
 	return this.datetime
 }
 
-func (this *ClientTCP) Read() {
+func (this *ClientTCP) read() {
 	Buf := make([]uint8, 1536)
 
 	for {
@@ -109,7 +109,7 @@ func (this *ClientTCP) clientEvent() {
 	for {
 		select {
 			case <- this.chConnected:
-				go this.Read()
+				go this.read()
 				this.ipport = this.hClient.LocalAddr().String()
 				this.datetime = time.Now()
 				if this.OnClientConnected != nil { this.OnClientConnected(this) }
@@ -122,7 +122,7 @@ func (this *ClientTCP) clientEvent() {
 				//Log
 
 			case <- this.chClose:
-				if this.OnClientClose != nil { this.OnClientClose(this.ipport) }
+				if this.OnClientDisconnected != nil { this.OnClientDisconnected(this.ipport) }
 				return
 		}
 	}
