@@ -26,12 +26,12 @@ type ServerTCP struct {
 	OnClientAccept onClientAccept
 	OnClientRead   onClientRead
 	OnClientWrite  onClientWrite
-	OnClientClose  onClientClose
+	OnClientDisconnected  onClientDisconnected
 }
 
 func (this *ServerTCP) Listen(Port string) error {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	if this.OverTime == 0 { this.OverTime = 60}
+	if this.OverTime == 0 { this.OverTime = 60 }
 
 	addr, err := net.ResolveTCPAddr("tcp", ":" + Port)
 	if err != nil { return err }
@@ -165,7 +165,7 @@ func (this *ServerTCP) clientEvent() {
 				IPPort = Client.ipport
 				this.CloseClient(Client)
 				this.clearClient(IPPort)
-				if this.OnClientClose != nil { this.OnClientClose(IPPort) }
+				if this.OnClientDisconnected != nil { this.OnClientDisconnected(IPPort) }
 
 			case <-this.chStop: return
 		}
