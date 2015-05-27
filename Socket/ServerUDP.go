@@ -6,7 +6,6 @@ import (
 	"time"
 	"sync"
 	"runtime"
-	
 )
 
 type ServerUDP struct {
@@ -55,6 +54,10 @@ func (this *ServerUDP) Stop() error {
 	return this.hServer.Close()
 }
 
+func (this *ServerUDP) ClientCount() int {
+	return len(this.clientList)
+}
+
 func (this *ServerUDP) clearClient(IPPort string) {
 	delete(this.clientList, IPPort)
 }
@@ -71,6 +74,8 @@ func (this *ServerUDP) waitClient() {
 		Client = this.clientList[IPPort]
 		if Client == nil {
 			Client = &ClientUDP{}
+			Client.hClient = this.hServer
+			Client.remoteAddr = addr
 			Client.ipport = IPPort
 			Client.datetime = time.Now()
 			Client.dataBuf = make([]uint8, 0)
