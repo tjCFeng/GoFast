@@ -25,11 +25,11 @@ func DDNSOnUpdated(UpdateResult string) {
 
 /*ServerTCP********************************************************************/
 func ClientOnAccept(Client *Socket.ClientTCP) {
-	//fmt.Println("Accept: ", Client.IPPort())
+	fmt.Println("Accept: ", Client.IPPort())
 }
 
 func ClientOnRead(Client *Socket.ClientTCP) {
-	//fmt.Println("Read: " + Client.GetDateTime().String())
+	fmt.Println("Read: " + Client.GetDateTime().String())
 	Data, _ := Client.GetData()
 	Client.ClearData(0)
 	Client.Send([]uint8(Data))
@@ -37,7 +37,7 @@ func ClientOnRead(Client *Socket.ClientTCP) {
 }
 
 func ClientOnClose(IPPort string) {
-	//fmt.Println("CloseClient: ", IPPort)
+	fmt.Println("CloseClient: ", IPPort)
 }
 
 /*ClientTCP********************************************************************/
