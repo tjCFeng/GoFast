@@ -5,10 +5,9 @@ import (
 	"bufio"
 	"os"
 	"time"
-	//"github.com/tjCFeng/GoFast/DDNS"
-	//"github.com/tjCFeng/GoFast/Socket"
-	"./DDNS"
-	"./Socket"
+	"github.com/tjCFeng/GoFast/DDNS"
+	"github.com/tjCFeng/GoFast/Socket"
+	"github.com/tjCFeng/GoFast/WebMap"
 )
 
 /*DDNS************************************************************************/
@@ -117,6 +116,11 @@ func main() {
 	time.Sleep(time.Second * 1)
 	clientUDP.Send([]uint8("Client Send UDP Data!")) //必须用Send
 
+	//WebMap
+	mapBD := &WebMap.MapBD {Token: "XXXXXXXX"}
+	X, Y, err := mapBD.ConvertLL(117.0000, 39.0000)
+	s, err := mapBD.LocationLL(X, Y)
+	fmt.Println(s, err)
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
