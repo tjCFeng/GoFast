@@ -29,11 +29,10 @@ func ClientOnAccept(Client *Socket.ClientTCP) {
 }
 
 func ClientOnRead(Client *Socket.ClientTCP) {
-	fmt.Println("Read: " + Client.GetDateTime().String())
 	Data, _ := Client.GetData()
 	Client.ClearData(0)
-	Client.Send([]uint8(Data))
-	//Client.Close()
+	fmt.Println("Read: " + string(Data))
+	Client.Send(Data)
 }
 
 func ClientOnClose(IPPort string) {
@@ -72,6 +71,22 @@ func ClientUDPReceived(Client *Socket.ClientUDP) {
 
 func ClientUDPClose (Client *Socket.ClientUDP) {
 	fmt.Println("UDP Client: ", Client)
+}
+
+/*WebSocket********************************************************************/
+func WSOnAccept(Client *Socket.ClientTCP) {
+	fmt.Println("WSAccept: ", Client.IPPort())
+}
+
+func WSOnRead(Client *Socket.ClientTCP) {
+	Data := Socket.WebSocketGetData(Client)
+	Socket.WebSocketClearData(Client, 0)
+	fmt.Println("WSRead: " + string(Data))
+	Client.Send(Data)
+}
+
+func WSOnClose(IPPort string) {
+	fmt.Println("WSCloseClient: ", IPPort)
 }
 
 func main() {
@@ -115,12 +130,21 @@ func main() {
 	defer clientUDP.Close()
 	time.Sleep(time.Second * 1)
 	clientUDP.Send([]uint8("Client Send UDP Data!")) //必须用Send
+	
+	serverWS := new(Socket.ServerWS)
+	serverWS.OnWSClientConnected = WSOnAccept
+	serverWS.OnWSClientRead = WSOnRead
+	serverWS.OnWSClientDisconnected = WSOnClose
+	serverWS.Listen("8080")
+	defer serverWS.Stop()
 
-	//WebMap
-	mapBD := &WebMap.MapBD {Token: "XXXXXXXX"}
-	X, Y, err := mapBD.ConvertLL(117.0000, 39.0000)
+	mapBD := &WebMap.MapBD {Token: "Baidu Map Token"}
+	X, Y, err := mapBD.ConvertLL(117.2585, 39.0940)
+	fmt.Println(X, "_", Y, "_", err)
+
 	s, err := mapBD.LocationLL(X, Y)
 	fmt.Println(s, err)
+
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
