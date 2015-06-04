@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="GB2312" />
+    <title>HTML5 Web Socket Client</title>
+    <style type='text/css'>
+      div#divChat { width:30em; }
+      textarea.txtarea { float:left; width: 30em; height: 15em;}
+      input.txt { float:left; display: inline; width: 26em; }
+      input.btn { float:left; display: inline; width: 4em; }
+    </style>
+    <script>
+      var WS = null; Support = false; Connected = false; 
+      var KeepID = 0; ConnectID = 0;
+
+      function KeepData()
+      {
+        WS.send("@@K");
+      }
+
+      function Reconnect()
+      {
+        /*if (Connected)
+        {
+          window.clearInterval(ConnectID);
+          Connected = 0;
+          return ;
+        }*/
+
+        $("ChatMain").value += "正在重连。。。。。。\n";
+        InitWebSocket();
+      }
+
+      function $()
+      { 
+        return document.getElementById(arguments[0]); 
+      }
+
+      function InitWebSocket()
+      {
+        var Support = "WebSocket" in window ? "WebSocket" : ("MozWebSocket" in window ? "MozWebSocket" : null);
+        if (!Support)
+        {
+          alert("该浏览器不支持WebSocket");
+          return false;
+        }
+
+        WS = new window[Support]("ws://127.0.0.1:8080/");
+        if (!WS)
+        {
+          Connected = false;
+          return false;
+        }
+        WS.onopen = OnOpen;
+        WS.onmessage = OnMessage;
+        WS.onclose = OnClose;
+
+        $('ChatMsg').readOnly = false;
+        $('ChatSend').disabled = false;
+
+        Connected = true;
+        return true;
+      }
+
+      function OnOpen()
+      {
+        if (ConnectID > 0)
+        {
+          window.clearInterval(ConnectID);
+          ConnectID = 0;
+        }
+        $("ChatMain").value += "连接服务器 成功！\n";
+        KeepID = window.setInterval(KeepData, 30000);
+      }
+
+      function OnMessage(MSG)
+      {
+        $("ChatMain").value += "收到数据：" + MSG.data + "\n";
+      }
+
+      function OnClose()
+      {
+        Connected = false;
+        if (KeepID > 0)
+        {
+          window.clearInterval(KeepID); 
+          KeepID = 0;
+        }
+
+        if (ConnectID == 0)
+        {
+          $("ChatMain").value += "服务器连接 断开！正在重连。。。\n";
+          ConnectID = window.setInterval(Reconnect, 30000);
+        }
+      }
+
+      function SendClick()
+      {
+        var MSG = "";
+        MSG = $("ChatMsg").value;
+        if (MSG)
+        {
+          WS.send(MSG);
+          $("ChatMain").value += "发送数据：" + MSG + "\n";
+        }
+      }
+    </script>
+  </head>
+
+  <body onLoad="InitWebSocket();">
+    <h2>HTML5 Web Socket Client</h2>
+    <div id="divChat">
+      <textarea id="ChatMain" readonly="readonly" class="txtarea"></textarea>
+      <input type="text" id="ChatMsg" readonly="readonly" class="txt" />
+      <input type="button" id="ChatSend" value="Send" onClick="SendClick();" disabled="disabled" class="btn" />
+    </div>
+  </body>
+</html>
