@@ -1,4 +1,4 @@
-package ICMP
+package Socket
 
 import (
 	"encoding/binary"
