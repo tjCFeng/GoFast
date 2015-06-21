@@ -264,6 +264,7 @@ func (this *ServerWS)encodeData(Data []uint8, Mask []uint8) []uint8 {
 			if J == Len { break }
 			Data[J] = Data[J] ^ Mask[(I % 4)]
 			J++
+			I++
 		}
 	}
 		
