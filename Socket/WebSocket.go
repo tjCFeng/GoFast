@@ -244,7 +244,15 @@ func (this *ServerWS)encodeData(Data []uint8, Mask []uint8) []uint8 {
 		Result = append(Result, uint8(Len >> 8), uint8(Len & 0xFF))
 		I += 2
 	} else {
-		
+		Result = append(Result, 
+			uint8((Len >> 56) & 0xFF),
+			uint8((Len >> 48) & 0xFF),
+			uint8((Len >> 40) & 0xFF),
+			uint8((Len >> 32) & 0xFF),
+			uint8((Len >> 24) & 0xFF),
+			uint8((Len >> 16) & 0xFF),
+			uint8((Len >> 8) & 0xFF),
+			uint8(Len & 0xFF))
 		I += 8
 	}
 
