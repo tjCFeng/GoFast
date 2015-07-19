@@ -1,4 +1,4 @@
-package WebMap
+package GNSS
 
 import (
 	"errors"
