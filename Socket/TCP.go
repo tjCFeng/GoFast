@@ -61,6 +61,8 @@ func (this *ClientTCP) Close() {
 }
 
 func (this *ClientTCP) Send(Data []uint8) (int, error) {
+	if this.hClient == nil { return 0, errors.New("unconnected") }
+	
 	Buf := &Data
 	if this.OnClientWrite != nil { this.OnClientWrite(this, Buf) }
 	return this.hClient.Write(*Buf)
