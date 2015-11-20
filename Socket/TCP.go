@@ -1,79 +1,72 @@
 package Socket
 
 import (
-	"net"
-	"runtime"
-	"strings"
-	"sync"
+	"errors"
 	"time"
+	"bytes"
+	"net"
+	"sync"
+	"bufio"
 )
 
-/*ClientTCP********************************************************************/
-type onClientConnected func(Client *ClientTCP)
-type onClientRead func(Client *ClientTCP)
-type onClientWrite func(Client *ClientTCP, Data *[]uint8)
-type onClientDisconnected func(IPPort string)
+/*Client***********************************************************************/
+	type onConnected func(Client *ClientTCP)
+	type onDisconnected func(Client *ClientTCP)
+	type onReceived func(Client *ClientTCP)
+	type onSended func(Client *ClientTCP)
 
-type ClientTCP struct {
-	//ClientTCP、ServerTCP共用
-	hClient  *net.TCPConn
-	ipport   string
-	datetime time.Time
-	dataBuf  []uint8
-	dataLen  int
-	mutex    *sync.Mutex
+	type ClientTCP struct {
+		hClient		net.Conn
+		Server		*ServerTCP
+		dataBuf		*bytes.Buffer
+		dataLen		int
+		mutex		*sync.Mutex
+		ipport		string //Server用时保存Client地址，Client用时保存Server地址重连用
+		
+		OnConnected		onConnected
+		OnDisconnected	onDisconnected
+		OnReceived		onReceived
+		OnSended		onSended
+	}
 	
-	//ClientTCP单独使用
-	chConnected chan bool
-	chRead   chan bool
-	chWrite  chan bool
-	chClose  chan bool
-	
-	OnClientConnected onClientConnected
-	OnClientRead   onClientRead
-	OnClientWrite  onClientWrite
-	OnClientDisconnected  onClientDisconnected
-
-	Tag		interface{}
+func (this *ClientTCP) ReConnect() error {
+	return this.Connect(this.ipport)
 }
-
-func (this *ClientTCP) Connect(RemoteIP, RemotePort string) error {
-	addr, err := net.ResolveTCPAddr("tcp", RemoteIP + ":" + RemotePort)
-	if err != nil { return err }
 	
-	this.chConnected = make(chan bool)
-	this.chRead = make(chan bool)
-	this.chWrite = make(chan bool)
-	this.chClose= make(chan bool)
-
+func (this *ClientTCP) Connect(RemoteIPPort string) error { //"IP:Port"
+	this.ipport = RemoteIPPort
+	
+	addr, err := net.ResolveTCPAddr("tcp", this.ipport)
+	if err != nil { return err }
 	this.hClient, err = net.DialTCP("tcp",  nil, addr)
 	if err != nil { return err }
-
-	go this.clientEvent()
+	
+	this.dataBuf = bytes.NewBuffer(nil)
+	this.dataLen = 0
 	this.mutex = &sync.Mutex{}
-	this.chConnected <- true
-
+	
+	
+	go this.clientEvent()
+	if this.OnConnected != nil { this.OnConnected(this) }
+	
 	return nil
 }
 
-func (this *ClientTCP) Close() {
-	this.hClient.Close()
+func (this *ClientTCP) GetIPPort() string {
+	return this.hClient.LocalAddr().String()
 }
-
-func (this *ClientTCP) Send(Data []uint8) (int, error) {
-	if this.hClient == nil { return 0, errors.New("unconnected") }
 	
-	Buf := &Data
-	if this.OnClientWrite != nil { this.OnClientWrite(this, Buf) }
-	return this.hClient.Write(*Buf)
+/*Server & Client 共用**********************************************************/
+func (this *ClientTCP) Close() error {
+	return this.hClient.Close()
 }
 
-func (this *ClientTCP) IPPort() string {
-	return this.ipport
-}
-
-func (this *ClientTCP) GetData() (Data []uint8, Len int) {
-	return this.dataBuf, this.dataLen
+func (this *ClientTCP) GetData(Len int) (Data []uint8, Count int) {
+	if (Len == 0) || (Len > this.dataLen) {
+		return this.dataBuf.Bytes(), this.dataLen
+	} else {
+		return this.dataBuf.Bytes()[:Len], Len
+	}
 }
 
 func (this *ClientTCP) ClearData(Len int) {
@@ -82,221 +75,174 @@ func (this *ClientTCP) ClearData(Len int) {
 	
 	switch Len {
 		case 0:
-			this.dataBuf = this.dataBuf[0:0]
+			this.dataBuf.Reset()
 			this.dataLen = 0
 		default:
-			this.dataBuf = this.dataBuf[Len - 1:]
+			tmp := this.dataBuf.Bytes()[Len:]
+			this.dataBuf.Reset()
+			this.dataBuf.Write(tmp)
 			this.dataLen -= Len
 	}
 }
 
-func (this *ClientTCP) GetDateTime() time.Time {
-	return this.datetime
-}
-
-func (this *ClientTCP) read() {
-	Buf := make([]uint8, 1536)
-
-	for {
-		count, err := this.hClient.Read(Buf)
-		if (err != nil) || (count == 0) {
-			this.chClose <- true
-			runtime.Goexit()
-			return
-		}
-
-		this.mutex.Lock()
-		this.dataBuf = append(this.dataBuf, Buf[0:count]...)
-		this.dataLen += count
-		this.mutex.Unlock()
-		this.chRead <- true
+func (this *ClientTCP) Send(Data []uint8) (int, error) {
+	Len, err := this.hClient.Write(Data)
+	if this.Server != nil { //Server用
+		this.Server.chWrite <- this
+	} else {
+		if this.OnSended != nil { this.OnSended(this) } //Client用
 	}
+	
+	return Len, err
 }
 
 func (this *ClientTCP) clientEvent() {
-	for {
-		select {
-			case <- this.chConnected:
-				go this.read()
-				this.ipport = this.hClient.LocalAddr().String()
-				this.datetime = time.Now()
-				if this.OnClientConnected != nil { this.OnClientConnected(this) }
-
-			case <- this.chRead:
-				this.datetime = time.Now()
-				if this.OnClientRead != nil { this.OnClientRead(this) }
-
-			case <- this.chWrite:
-				//Log
-
-			case <- this.chClose:
-				if this.OnClientDisconnected != nil { this.OnClientDisconnected(this.ipport) }
-				return
-		}
+	if this.Server != nil {
+		this.hClient.SetDeadline(time.Now().Add(time.Duration(this.Server.OverTime) * time.Second))
 	}
-}
-
-/*ServerTCP********************************************************************/
-type onClientAccept func(Client *ClientTCP)
-
-type ServerTCP struct {
-	hServer    *net.TCPListener
-	clientList map[string]*ClientTCP //[IPPort] *ClientTCP
-	blackList  map[string]time.Time  //[IP] DT
-	gBuffer    []uint8
-
-	chAccept chan *ClientTCP
-	chRead   chan *ClientTCP
-	chWrite  chan *ClientTCP
-	chClose  chan *ClientTCP
-	chStop   chan bool
-
-	OverTime uint16
-	OnClientAccept onClientAccept
-	OnClientRead   onClientRead
-	OnClientWrite  onClientWrite
-	OnClientDisconnected  onClientDisconnected
-}
-
-func (this *ServerTCP) Listen(Port string) error {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	if this.OverTime == 0 { this.OverTime = 30 }
-
-	addr, err := net.ResolveTCPAddr("tcp", ":" + Port)
-	if err != nil { return err }
-
-	this.chAccept = make(chan *ClientTCP, 100)
-	this.chRead = make(chan *ClientTCP, 100)
-	this.chWrite = make(chan *ClientTCP, 100)
-	this.chClose = make(chan *ClientTCP, 100)
-	this.chStop = make(chan bool)
-
-	this.clientList = make(map[string]*ClientTCP)
-	this.blackList = make(map[string]time.Time)
-	this.gBuffer = make([]uint8, 1536)
-
-	this.hServer, err = net.ListenTCP("tcp", addr)
-	if err != nil { return err }
-
-	go this.clientEvent()
-	go this.clientAccept()
-
-	return nil
-}
-
-func (this *ServerTCP) Stop() error {
-	this.chStop <- true
-
-	defer func() {
-		for IPPort, Client := range this.clientList {
-			this.CloseClient(Client)
-			this.clearClient(IPPort)
-		}
-	}()
-
-	return this.hServer.Close()
-}
-
-func (this *ServerTCP) clearClient(IPPort string) {
-	delete(this.clientList, IPPort)
-}
-
-func (this *ServerTCP) CloseClient(Client *ClientTCP) {
-	if Client == nil { return }
-	if Client.hClient == nil { return }
-
-	Client.hClient.Close()
-}
-
-func (this *ServerTCP) CloseClientByIPPort(IPPort string) {
-	Client, ok := this.clientList[IPPort]
-	if !ok { return }
-
-	this.CloseClient(Client)
-}
-
-func (this *ServerTCP) AddBlackList(IP string) {
-	this.blackList[IP] = time.Now()
-}
-
-func (this *ServerTCP) ClientCount() int {
-	return len(this.clientList)
-}
-
-func (this *ServerTCP) clientAccept() {
-	var IPPort string = ""
-
+	
+	reader := bufio.NewReader(this.hClient)
+	Buf := make([]uint8, 1536)
+	var Len int = 0
+	var err error = nil
+	
 	for {
-		c, err := this.hServer.AcceptTCP()
-		if err != nil { continue }
-		IPPort = c.RemoteAddr().String()
-
-		if _, ok := this.blackList[strings.Split(IPPort, ":")[0]]; ok {
-			//Log BlackList
-			c.Close()
-			continue
-		}
-
-		c.SetDeadline(time.Now().Add(time.Duration(this.OverTime) * time.Second))
-		Client := new(ClientTCP)
-		Client.hClient = c
-		Client.ipport = IPPort
-		Client.dataBuf = make([]uint8, 0)
-		Client.dataLen = 0
-		Client.hClient.SetReadBuffer(1536)
-		Client.mutex = &sync.Mutex{}
-		this.clientList[IPPort] = Client
-
-		this.chAccept <- Client
-		go this.waitClient(Client)
-	}
-}
-
-func (this *ServerTCP) waitClient(Client *ClientTCP) {
-	for {
-		count, err := Client.hClient.Read(this.gBuffer)
-		if (err != nil) || (count == 0) {
-			this.chClose <- Client
-			runtime.Goexit()
+		Len, err = reader.Read(Buf)
+		if err != nil {
+			this.hClient.Close()
+			this.ClearData(0)
+			if this.Server != nil { //Server用
+				this.Server.chClose <- this
+			} else { //Client用
+				if this.OnDisconnected != nil {
+					this.Close()
+					this.OnDisconnected(this)
+				}
+			}
 			return
 		}
-		Client.hClient.SetDeadline(time.Now().Add(time.Duration(this.OverTime) * time.Second))
+		
+		if this.Server != nil {
+			this.hClient.SetDeadline(time.Now().Add(time.Duration(this.Server.OverTime) * time.Second))
+		}
+		this.mutex.Lock()
+		this.dataBuf.Write(Buf[:Len])
+		this.dataLen += Len
+		this.mutex.Unlock()
+		
+		if this.Server != nil { //Server用
+			this.Server.chRead <- this
+		} else { //Client用
+			if this.OnReceived != nil { this.OnReceived(this) }
+		}
+	}
+}
 
-		Client.mutex.Lock()
-		Client.dataBuf = append(Client.dataBuf, this.gBuffer[0:count]...)
-		Client.dataLen += count
-		Client.mutex.Unlock()
-		this.chRead <- Client
+/*Server***********************************************************************/
+	type onClientAccept func(Sender *ServerTCP, Client *ClientTCP)
+	type onClientClosed func(Sender *ServerTCP, IPPort string)
+	type onClientRead func(Sender *ServerTCP, Client *ClientTCP)
+	type onClientWrite func(Sender *ServerTCP, Client *ClientTCP)
+	
+	type ServerTCP struct {
+		hServer		net.Listener
+		clients		map[string]*ClientTCP
+		
+		chAccept	chan *ClientTCP
+		chClose		chan *ClientTCP
+		chRead		chan *ClientTCP
+		chWrite		chan *ClientTCP
+		chStop		chan bool
+		
+		OverTime			uint16
+		OnClientAccept		onClientAccept
+		OnClientRead		onClientRead
+		OnClientWrite		onClientWrite
+		OnClientClosed		onClientClosed
+	}
+
+func (this *ServerTCP) Listen(Port string) error {
+	var err error
+	
+	this.hServer, err = net.Listen("tcp", ":" + Port)
+	if err != nil { return err}
+	
+	this.chAccept = make(chan *ClientTCP, 1000)
+	this.chClose = make(chan *ClientTCP, 1000)
+	this.chRead = make(chan *ClientTCP, 1000)
+	this.chWrite = make(chan *ClientTCP, 1000)
+	this.chStop = make(chan bool)
+	
+	this.clients = make(map[string]*ClientTCP)
+	
+	if this.OverTime == 0 { this.OverTime = 30 }
+	
+	go this.clientEvent()
+	go this.waitAccept()
+	
+	return err
+}
+
+func (this *ServerTCP) Stop() {
+	defer func() {
+		for _, Client := range this.clients {
+			Client.hClient.Close()
+			this.chClose <- Client
+		}
+	}()
+	
+	this.chStop <- true
+	this.hServer.Close()
+}
+
+func (this *ServerTCP) waitAccept() {
+	for {
+		c, err := this.hServer.Accept()
+		if err != nil { return }
+		
+		Client := new(ClientTCP)
+		//Client.OverTime = this.OverTime
+		Client.hClient = c
+		Client.Server = this
+		Client.ipport = c.RemoteAddr().String()
+		Client.dataBuf = bytes.NewBuffer(nil)
+		Client.dataLen = 0
+		Client.mutex = &sync.Mutex{}
+		this.clients[Client.ipport] = Client
+		
+		go Client.clientEvent()
+		this.chAccept <- Client
 	}
 }
 
 func (this *ServerTCP) clientEvent() {
-	var IPPort string = ""
-	var Client *ClientTCP = nil
-
 	for {
 		select {
-			case Client = <-this.chAccept:
-				if Client == nil { continue }
-				Client.datetime = time.Now()
-				if this.OnClientAccept != nil { this.OnClientAccept(Client) }
-
-			case Client = <-this.chRead:
-				if Client == nil { continue }
-				Client.datetime = time.Now()
-				if this.OnClientRead != nil { this.OnClientRead(Client) }
-
-			case Client = <-this.chWrite:
-				//Log
-
-			case Client = <-this.chClose:
-				if Client == nil { continue }
-				IPPort = Client.ipport
-				this.CloseClient(Client)
-				this.clearClient(IPPort)
-				if this.OnClientDisconnected != nil { this.OnClientDisconnected(IPPort) }
-
-			case <-this.chStop: return
+		case <- this.chStop:
+			return
+		case Client := <- this.chAccept:
+			if this.OnClientAccept != nil { this.OnClientAccept(this, Client) }
+		case Client := <- this.chClose:
+			delete(this.clients, Client.ipport)
+			if this.OnClientClosed!= nil { this.OnClientClosed(this, Client.ipport) }
+		case Client := <- this.chRead:
+			if this.OnClientRead != nil { this.OnClientRead(this, Client) }
+		case Client := <- this.chWrite:
+			if this.OnClientWrite != nil { this.OnClientWrite(this, Client) }
 		}
 	}
+}
+
+func (this *ServerTCP) Send(IPPort string, Data []uint8) (int, error) {
+	Client, ok := this.clients[IPPort]
+	if !ok { return 0, errors.New("unconnected") }
+
+	Len, err := Client.Send(Data)
+	this.chWrite <- Client
+	
+	return Len, err
+}
+
+func (this *ServerTCP) ClientCount() int {
+	return len(this.clients)
 }
